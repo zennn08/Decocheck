@@ -1,11 +1,13 @@
 package com.example.decocheck;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.text.Html;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.cardview.widget.CardView;
@@ -25,9 +27,12 @@ import java.util.Locale;
 public class DetailActivity extends AppCompatActivity {
 
     private TextView tvTitle, tvAuthor, tvDate, tvContent;
-    private ImageView ivFeaturedImage, btnBack;
+    private ImageView ivFeaturedImage, btnBack, btnShare;
     private CardView imageCard;
     private ProgressBar progressBar;
+
+    private String postTitle, postContent, postAuthor, postDate, postImageUrl;
+    private int postId;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -42,7 +47,8 @@ public class DetailActivity extends AppCompatActivity {
         });
 
         initViews();
-        setupBackButton();
+        getIntentData();
+        setupButtons();
         loadPostData();
     }
 
@@ -55,15 +61,60 @@ public class DetailActivity extends AppCompatActivity {
             ivFeaturedImage = findViewById(R.id.ivFeaturedImage);
             imageCard = findViewById(R.id.imageCard);
             btnBack = findViewById(R.id.btnBack);
+            btnShare = findViewById(R.id.btnShare);
             progressBar = findViewById(R.id.progressBar);
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    private void setupBackButton() {
+    private void getIntentData() {
+        // Get data from intent
+        postId = getIntent().getIntExtra("post_id", 0);
+        postTitle = getIntent().getStringExtra("post_title");
+        postContent = getIntent().getStringExtra("post_content");
+        postAuthor = getIntent().getStringExtra("post_author");
+        postDate = getIntent().getStringExtra("post_date");
+        postImageUrl = getIntent().getStringExtra("post_image");
+    }
+
+    private void setupButtons() {
+        // Back button
         if (btnBack != null) {
             btnBack.setOnClickListener(v -> finish());
+        }
+
+        // Share button
+        if (btnShare != null) {
+            btnShare.setOnClickListener(v -> shareArticle());
+        }
+    }
+
+    private void shareArticle() {
+        try {
+            String shareTitle = postTitle != null ? Html.fromHtml(postTitle, Html.FROM_HTML_MODE_LEGACY).toString() : "Artikel Menarik";
+            String shareText = shareTitle + "\n\n" +
+                    "Baca artikel lengkapnya di aplikasi Decocheck!\n\n" +
+                    "Download aplikasi Decocheck untuk membaca lebih banyak artikel menarik.";
+
+            Intent shareIntent = new Intent(Intent.ACTION_SEND);
+            shareIntent.setType("text/plain");
+            shareIntent.putExtra(Intent.EXTRA_SUBJECT, shareTitle);
+            shareIntent.putExtra(Intent.EXTRA_TEXT, shareText);
+
+            // Create chooser
+            Intent chooser = Intent.createChooser(shareIntent, "Bagikan artikel melalui:");
+
+            // Check if there are apps that can handle this intent
+            if (shareIntent.resolveActivity(getPackageManager()) != null) {
+                startActivity(chooser);
+            } else {
+                Toast.makeText(this, "Tidak ada aplikasi untuk berbagi", Toast.LENGTH_SHORT).show();
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            Toast.makeText(this, "Gagal membagikan artikel", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -71,17 +122,10 @@ public class DetailActivity extends AppCompatActivity {
         showLoading(true);
 
         try {
-            // Get data from intent
-            String title = getIntent().getStringExtra("post_title");
-            String content = getIntent().getStringExtra("post_content");
-            String author = getIntent().getStringExtra("post_author");
-            String date = getIntent().getStringExtra("post_date");
-            String imageUrl = getIntent().getStringExtra("post_image");
-
             // Set title
             if (tvTitle != null) {
-                if (title != null && !title.isEmpty()) {
-                    tvTitle.setText(Html.fromHtml(title, Html.FROM_HTML_MODE_LEGACY));
+                if (postTitle != null && !postTitle.isEmpty()) {
+                    tvTitle.setText(Html.fromHtml(postTitle, Html.FROM_HTML_MODE_LEGACY));
                 } else {
                     tvTitle.setText("Artikel");
                 }
@@ -89,8 +133,8 @@ public class DetailActivity extends AppCompatActivity {
 
             // Set author
             if (tvAuthor != null) {
-                if (author != null && !author.isEmpty()) {
-                    tvAuthor.setText(author);
+                if (postAuthor != null && !postAuthor.isEmpty()) {
+                    tvAuthor.setText(postAuthor);
                 } else {
                     tvAuthor.setText("Admin");
                 }
@@ -98,8 +142,8 @@ public class DetailActivity extends AppCompatActivity {
 
             // Set date
             if (tvDate != null) {
-                if (date != null && !date.isEmpty()) {
-                    tvDate.setText(formatDate(date));
+                if (postDate != null && !postDate.isEmpty()) {
+                    tvDate.setText(formatDate(postDate));
                 } else {
                     tvDate.setText("Tanggal tidak tersedia");
                 }
@@ -107,8 +151,8 @@ public class DetailActivity extends AppCompatActivity {
 
             // Set content
             if (tvContent != null) {
-                if (content != null && !content.isEmpty()) {
-                    String cleanContent = Html.fromHtml(content, Html.FROM_HTML_MODE_LEGACY).toString();
+                if (postContent != null && !postContent.isEmpty()) {
+                    String cleanContent = Html.fromHtml(postContent, Html.FROM_HTML_MODE_LEGACY).toString();
 
                     // Clean up content
                     cleanContent = cleanContent.replaceAll("\\s+", " ").trim(); // Remove extra whitespace
@@ -117,6 +161,7 @@ public class DetailActivity extends AppCompatActivity {
                     cleanContent = cleanContent.replaceAll("&amp;", "&"); // Fix ampersands
                     cleanContent = cleanContent.replaceAll("&lt;", "<"); // Fix less than
                     cleanContent = cleanContent.replaceAll("&gt;", ">"); // Fix greater than
+                    cleanContent = cleanContent.replaceAll("&quot;", "\""); // Fix quotes
 
                     if (!cleanContent.isEmpty()) {
                         tvContent.setText(cleanContent);
@@ -130,7 +175,7 @@ public class DetailActivity extends AppCompatActivity {
 
             // Load featured image
             if (imageCard != null && ivFeaturedImage != null) {
-                if (imageUrl != null && !imageUrl.isEmpty()) {
+                if (postImageUrl != null && !postImageUrl.isEmpty()) {
                     imageCard.setVisibility(View.VISIBLE);
 
                     RequestOptions requestOptions = new RequestOptions()
@@ -139,7 +184,7 @@ public class DetailActivity extends AppCompatActivity {
                             .error(R.drawable.ic_image);
 
                     Glide.with(this)
-                            .load(imageUrl)
+                            .load(postImageUrl)
                             .apply(requestOptions)
                             .into(ivFeaturedImage);
                 } else {
